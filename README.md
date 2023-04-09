@@ -17,6 +17,23 @@ docker run -d --name nocodb -v "$(pwd)"/nocodb:/usr/app/data/ --volume /etc/time
 
 http://103.221.220.249:8080/
 
+Books
+
+Name
+Status (Draft, Active, Deleted)
+Authors
+Published Year
+Published By
+ThumbImage
+
+BookCollections
+Name
+BooksInCollection
+
+Books_BookCollections_MM
+
+
+
 
 
 docker run --detach     --name nginx-proxy     --restart=always     --publish 80:80     --publish 443:443     --volume certs:/etc/nginx/certs     --volume vhost:/etc/nginx/vhost.d     --volume html:/usr/share/nginx/html     --volume /var/run/docker.sock:/tmp/docker.sock:ro     nginxproxy/nginx-proxy:latest
@@ -27,6 +44,9 @@ docker run --detach     --name tinyflutterteam_landing_page     --restart=always
 
 
 docker run -d --name nocodb --volume /etc/timezone:/etc/timezone:ro --volume /etc/localtime:/etc/localtime:ro -p 8080:8080 nocodb/nocodb:latest
+
+
+Name
 
 
 python3.10 -m pip install virtualenv
