@@ -60,6 +60,7 @@ python -m pip install Pillow
 python -m pip install scikit-learn
 python -m pip install fastapi
 python -m pip install uvicorn
+python -m pip install python-multipart
 
 
 
