@@ -59,7 +59,11 @@ python -m pip install img2vec_pytorch
 python -m pip install Pillow
 python -m pip install scikit-learn
 python -m pip install fastapi
+python -m pip install uvicorn
 
+
+
+uvicorn api:app --reload
 
 
 from fastapi import FastAPI
