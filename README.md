@@ -48,11 +48,34 @@ docker run -d --name nocodb --volume /etc/timezone:/etc/timezone:ro --volume /et
 
 Name
 
+python -m pip freeze > requirements.txt
+# Update all package
+pip install -U -r requirements.txt
+
+# Update a package
+pip install -U fastapi
+
+# check broken package
+python -m pip check
+
+python -m pip install -r requirements.txt
+
+
+How to Create Python Requirements File After Development
+pip install pipreqs
+
+running pipreqs in the command line generates a requirements.txt file automatically:
+$ pipreqs /home/project/location
+Successfully saved requirements file in   /home/project/location/requirements.txt
 
 python3.10 -m pip install virtualenv
 
 python3.10 -m virtualenv venv
+
 source venv/bin/activate
+
+
+
 
 python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 python -m pip install img2vec_pytorch
@@ -61,6 +84,8 @@ python -m pip install scikit-learn
 python -m pip install fastapi
 python -m pip install uvicorn
 python -m pip install python-multipart
+python -m pip install pydantic
+python -m pip install requests
 
 
 

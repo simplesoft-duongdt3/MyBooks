@@ -1,21 +1,74 @@
 from typing import Annotated
 import base64
 import json
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 import requests
-
+import io
 import time
 from datetime import datetime
 import pickle
 import codecs
-from img2vec.img2vec_pytorch.img_to_vec import Img2Vec
+# from img2vec.img2vec_pytorch.img_to_vec import Img2Vec
+from img2vec_pytorch import Img2Vec
 from PIL import Image
 from sklearn.metrics.pairwise import cosine_similarity
+import logging
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 app = FastAPI()
-
+api_endpoint = "http://103.221.220.249:8080"
 # Initialize Img2Vec with GPU
 img2vec = Img2Vec(cuda=False, model='resnet18')
+
+
+def check_feature_vector_all_exists_books(image_feature_vector):
+    list_book_similar = []
+    
+    time_start = time.time()
+    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CThumbImage%2CThumb%20Image%20Feature%20Vector&where=where%3D%28Status%2Ceq%2CActive%29&limit=100&offset=0"
+
+    payload={}
+    headers = {
+        'accept': 'application/json',
+        'xc-token': '5Bdhl77iJJ1fIbF2fPb8hcCceNzSJvmt4NIya0aR'
+    }
+
+    response = requests.request("GET", url, headers=headers, data=payload)
+
+    result = json.loads(response.text)
+    if result:
+        list_book = result['list']
+        for book in list_book:
+            book_feature_vector = book['Thumb Image Feature Vector']
+            book_id = book['Id']
+            thumb_image_list = book['ThumbImage']
+            thumb_image = None
+            if thumb_image_list:
+                thumb_image = thumb_image_list[0]
+            book_name = book['Name']
+            if book_feature_vector:
+                decodeData = pickle.loads(codecs.decode(book_feature_vector.encode(),'base64'))
+
+                distance = cosine_similarity(image_feature_vector.reshape((1, -1)), decodeData.reshape((1, -1)))[0][0]
+                if distance >= 0.9:
+                    list_book_similar.append({
+                        'id': book_id,
+                        'name': book_name,
+                        'thumb_image': thumb_image,
+                        'distance': str(distance)
+                    })
+                print("Id = " + str(book_id) + " distance = " + str(distance))
+    time_end = time.time()
+    print("check_feature_vector_all_exists_books time= " + str(time_end - time_start))
+    return list_book_similar
+
+def get_image_feature_vector(file_content):
+    # Read in an image (rgb format)
+    img = Image.open(io.BytesIO(file_content))
+    # Get a vector from img2vec, returned as a torch FloatTensor
+    vec = img2vec.get_vec(img, tensor=True)
+    return vec
 
 @app.get("/")
 async def root():
@@ -57,35 +110,16 @@ async def root():
     distance3 = cosine_similarity(vec.reshape((1, -1)), vec3.reshape((1, -1)))[0][0]
     time_end = time.time()
     print("distance3 = " + str(distance3) + " time= " + str(time_end - time_start))
-    
-
     return {"message": "Hello World"}
 
-
-# http://103.221.220.249:8080/api/v1/db/storage/upload?path=noco%2FMyBooks%2FBooks%2FThumbImage
-# [
-#   {
-#     "path": "download/noco/MyBooks/Books/ThumbImage/ZiP19ye8lom1Ey_Uva.jpg",
-#     "title": "b03.jpg",
-#     "mimetype": "image/jpeg",
-#     "size": 169120
-#   }
-# ]
-
-
-# http://103.221.220.249:8080/api/v1/db/meta/audits/rows/4/update
-# {"fk_model_id":"md_mzf11ykged3ibq","column_name":"ThumbImage","row_id":"4","value":"[{\"path\":\"download/noco/MyBooks/Books/ThumbImage/ZiP19ye8lom1Ey_Uva.jpg\",\"title\":\"b03.jpg\",\"mimetype\":\"image/jpeg\",\"size\":169120}]","prev_value":"[object Object]"}
-def create_book(result_upload):
+def create_draft_book(result_upload, feature_vector_base64):
     try:
-        print(f'create_book {result_upload}')
-        url = "http://103.221.220.249:8080/api/v1/db/data/v1/MyBooks/Books"
+        print(f'create_draft_book {result_upload}')
+        url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/DraftBooks"
 
         payload = json.dumps({
-            # "Name": "b1",
-            # "Authors": "Nuyen Minh Hoa",
-            # "Published Year": "2019",
-            # "Published By": "NXB Tong hop",
-            "ThumbImage": result_upload
+            "ThumbImage": result_upload,
+            "Thumb Image Feature Vector": feature_vector_base64
         })
         headers = {
             'accept': 'application/json',
@@ -96,24 +130,55 @@ def create_book(result_upload):
         response = requests.request("POST", url, headers=headers, data=payload)
         return json.loads(response.text)
     except Exception:
+        logging.exception("create_draft_book: An exception was thrown!")
         return None
 
-@app.post("/upload")
-async def create_file(
-    file: Annotated[UploadFile, File()],
-):
+def create_book(thumbImage, feature_vector_base64, name, author, published_year, published_by):
     try:
-        contents = file.file.read()
-        # base64_bytes = base64.b64encode(contents)
-        # base64_message = base64_bytes.decode('utf8')
-        today = datetime.now()
-        str_date_time = today.strftime("%Y%m%d-%H%M%S%f") + "-" + str(file.filename)
+        time_start = time.time()
+        logging.info(f'create_book {str(name)} {str(thumbImage)}')
+        url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books"
 
-        url = "http://103.221.220.249:8080/api/v1/db/storage/upload?path=MyBooks/Books/attachment/20230410"
+        payload = json.dumps({
+            "Name": name,
+            "Authors": author,
+            "Published Year": str(published_year),
+            "Published By": published_by,
+            "ThumbImage": thumbImage,
+            "Thumb Image Feature Vector": feature_vector_base64
+        })
+        headers = {
+            'accept': 'application/json',
+            'xc-token': '5Bdhl77iJJ1fIbF2fPb8hcCceNzSJvmt4NIya0aR',
+            'Content-Type': 'application/json'
+        }
+
+        response = requests.request("POST", url, headers=headers, data=payload)
+        logging.info(f'create_book response {str(response)}')
+        time_end = time.time()
+        logging.info("create_book time= " + str(time_end - time_start))
+        return json.loads(response.text)
+    except Exception:
+        logging.exception("create_book: An exception was thrown!")
+        return None
+
+def encode_base64_feature_vector(feature_vector):
+    pickled = pickle.dumps(feature_vector)
+    base64Data = codecs.encode(pickled, "base64").decode()
+    return base64Data
+
+def upload_file_image(file_name, file_contents, content_type):
+    try:
+        time_start = time.time()
+        logging.info(f"upload_file_image: file_name {file_name} content_type {content_type}")
+        today = datetime.now()
+        str_date_time = today.strftime("%Y%m%d")
+
+        url = f"{api_endpoint}/api/v1/db/storage/upload?path=MyBooks/Books/attachment/{str_date_time}"
 
         payload={}
         files=[
-            ('file',(str(file.filename),contents,str(file.content_type)))
+            ('file',(str(file_name), file_contents, str(content_type)))
         ]
         headers = {
             'xc-token': '5Bdhl77iJJ1fIbF2fPb8hcCceNzSJvmt4NIya0aR'
@@ -121,20 +186,47 @@ async def create_file(
 
         response = requests.request("POST", url, headers=headers, data=payload, files=files)
 
-        response_list = json.loads(response.text) 
-        print(str(response_list))
+        response_list = json.loads(response.text)
+        logging.info(f"upload_file_image response {str(response_list)}")
+
+        time_end = time.time()
+        logging.info("upload_draft_image time= " + str(time_end - time_start))
+        return response_list
+    except Exception as e:
+        logging.exception("upload_file_image: An exception was thrown!")
+        return None
+
+@app.post("/upload")
+async def upload_draft_image(
+    file: Annotated[UploadFile, File()],
+):
+    try:
+        time_start = time.time()
+        contents = file.file.read()
+
+        feature_vector = get_image_feature_vector(contents)
+        feature_vector_base64 = encode_base64_feature_vector(feature_vector)
+        list_book_similar = check_feature_vector_all_exists_books(feature_vector)
+
+        # base64_bytes = base64.b64encode(contents)
+        # base64_message = base64_bytes.decode('utf8')
+        response_list = upload_file_image(file.filename, contents, file.content_type)
+
         if response_list:
-            result_create_book = create_book(response_list)
+            result_create_draft_book = create_draft_book(response_list, feature_vector_base64)
+
+        time_end = time.time()
+        logging.info("upload_draft_image time= " + str(time_end - time_start))    
         return {
-            "date_time": str_date_time,
-            "file_name": file.filename,
-            "file_size": file.size,
+            # "file_name": file.filename,
+            # "file_size": file.size,
             # "file": base64_message,
-            "file_content_type": file.content_type,
-            "result_create_book": result_create_book
+            # "file_content_type": file.content_type,
+            "result_create_draft_book": result_create_draft_book,
+            'list_book_similar': list_book_similar
         }
-    except Exception:
-        return {"message": "There was an error uploading the file"}
+    except Exception as e:
+        logging.exception("upload_draft_image: An exception was thrown!")
+        raise HTTPException(status_code=500, detail="Error: " + str(e))
     finally:
         file.file.close()
-    
