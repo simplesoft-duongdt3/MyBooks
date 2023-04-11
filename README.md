@@ -87,8 +87,6 @@ python -m pip install python-multipart
 python -m pip install pydantic
 python -m pip install requests
 
-
-
 uvicorn api:app --reload
 
 

@@ -27,8 +27,6 @@ api_endpoint = "http://103.221.220.249:8080"
 # Initialize Img2Vec with GPU
 img2vec = Img2Vec(cuda=False, model='resnet18')
 
-
-
 def check_feature_vector_all_exists_books(image_feature_vector):
     list_book_similar = []
     
@@ -87,7 +85,7 @@ def get_draft_book_list_paging(page_index: int = 1, page_size: int = 20) -> Draf
     logger.info("get_draft_book_list_paging time= " + str(time_end - time_start))
     return list_draft_book
 
-def get_book_list_paging(page_index: int = 1, page_size: int = 20) -> DraftBookListResponse:    
+def get_book_list_paging(page_index: int = 1, page_size: int = 20) -> BookListResponse:    
     time_start = time.time()
     url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublished%20Year%2CPublished%20By%2CStatus%2CThumbImage%2CBookCollections%20List%2CCreatedAt%2CUpdatedAt&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29&limit={page_size}&offset={page_index-1}"
 
@@ -234,7 +232,7 @@ def upload_file_image(file_name, file_contents, content_type):
         logger.info("upload_file_image time= " + str(time_end - time_start))
         return response_list
     except Exception as e:
-        logger.exception("upload_file_image: An exception was thrown!")
+        logger.exception("upload_file_image: An exception was thrown! {str(e)}")
         return None
 
 @app.post("/upload")
@@ -263,7 +261,7 @@ async def upload_draft_image(
             'list_book_similar': list_book_similar
         }
     except Exception as e:
-        logger.exception("upload_draft_image: An exception was thrown!")
+        logger.exception("upload_draft_image: An exception was thrown! {str(e)}")
         raise HTTPException(status_code=500, detail="Error: " + str(e))
     finally:
         file.file.close()
@@ -280,7 +278,7 @@ async def get_draft_books(page: int = 1, limit: int = 20) -> DraftBookListRespon
         logger.info("get_draft_books time= " + str(time_end - time_start))
         return list_result
     except Exception as e:
-        logger.exception("get_draft_books: An exception was thrown!")
+        logger.exception("get_draft_books: An exception was thrown! {str(e)}")
         return None
     
 @app.get("/books")
@@ -295,7 +293,7 @@ async def get_books(page: int = 1, limit: int = 20) -> BookListResponse:
         logger.info("get_books time= " + str(time_end - time_start))
         return list_result
     except Exception as e:
-        logger.exception("get_books: An exception was thrown!")
+        logger.exception("get_books: An exception was thrown! {str(e)}")
         return None
     
     # 1. Add Model response for API create_draft_book
