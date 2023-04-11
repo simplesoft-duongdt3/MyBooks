@@ -88,52 +88,13 @@ python -m pip install pydantic
 python -m pip install requests
 python -m pip install loguru
 python -m pip install gunicorn
+python -m pip install python-dotenv
 
+cd app
 uvicorn api:app --reload
 
-gunicorn api:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+gunicorn api:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000  --daemon
 
+kill -9 `ps aux | grep gunicorn | grep api:app | awk '{ print $2 }'`
 
-from fastapi import FastAPI
-import time
-import pickle
-import codecs
-from img2vec_pytorch import Img2Vec
-from PIL import Image
-from sklearn.metrics.pairwise import cosine_similarity
-
-app = FastAPI()
-
-# Initialize Img2Vec with GPU
-img2vec = Img2Vec(cuda=False)
-
-@app.get("/")
-async def root():
-    time_start = time.time()
-
-    # Read in an image (rgb format)
-    img = Image.open('test.jpg')
-    # Get a vector from img2vec, returned as a torch FloatTensor
-    vec = img2vec.get_vec(img, tensor=True)
-    #print(vec)
-    pickled = pickle.dumps(vec)
-
-    print(f"length of {len(pickled)}")
-
-    base64Data = codecs.encode(pickled, "base64").decode()
-
-    print(base64Data)
-
-    decodeData = pickle.loads(codecs.decode(base64Data.encode(),'base64'))
-
-    print(f"length of {len(decodeData)}")
-    #print(decodeData)
-
-    distance = cosine_similarity(vec.reshape((1, -1)), decodeData.reshape((1, -1)))[0][0]
-
-
-    time_end = time.time()
-
-    print("distance = " + str(distance) + " time= " + str(time_end - time_start))
-
-    return {"message": "Hello World"}
+ps ax|grep gunicorn

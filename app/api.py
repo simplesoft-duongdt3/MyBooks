@@ -1,3 +1,4 @@
+import os
 from typing import Annotated
 import base64
 import json
@@ -13,7 +14,7 @@ from img2vec_pytorch import Img2Vec
 from PIL import Image
 from sklearn.metrics.pairwise import cosine_similarity
 from request_models import BookRequestToDb, CreateNewBookRequest
-from response_models import Book, BookFromDb, BookListResponse, BookListResponseFromDb, BookSimilarItem, CreateDraftBookResponse, DraftBook, DraftBookFromDb, DraftBookListResponse, DraftBookListResponseFromDb, ListBookSimilarResponse
+from response_models import Book, BookFromDb, BookListResponse, BookListResponseFromDb, BookSimilarItem, CreateDraftBookResponse, DraftBook, DraftBookFromDb, DraftBookListResponse, DraftBookListResponseFromDb
 
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -22,10 +23,14 @@ from loguru import logger
 logger.add("logs/file_log.log", format="{time} {level} {message}", rotation="12:00", level="INFO")
 
 import uvicorn
+from dotenv import load_dotenv
+load_dotenv()
 
 app = FastAPI()
-api_endpoint = "http://103.221.220.249:8080"
-# Initialize Img2Vec with GPU
+api_endpoint = name = os.getenv("HOST_DB", "")
+db_token = name = os.getenv("DB_TOKEN", "")
+
+# Initialize Img2Vec without GPU
 img2vec = Img2Vec(cuda=False, model='resnet18')
 
 def get_draft_book_detail_from_db(draft_book_id: int) -> DraftBookFromDb | None:
@@ -35,7 +40,7 @@ def get_draft_book_detail_from_db(draft_book_id: int) -> DraftBookFromDb | None:
     payload={}
     headers = {
         'accept': 'application/json',
-        'xc-token': '5Bdhl77iJJ1fIbF2fPb8hcCceNzSJvmt4NIya0aR'
+        'xc-token': db_token
     }
 
     response = requests.request("GET", url, headers=headers, data=payload)
@@ -54,12 +59,12 @@ def check_feature_vector_all_exists_books(image_feature_vector) -> list[BookSimi
     time_start = time.time()
     page_size = 100
     page_index = 1
-    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublishedYear%2CPublishedBy%2CStatus%2CThumbImage%2CBookCollections%20List%2CCreatedAt%2CUpdatedAt%2CThumbImageFeatureVector&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29&limit={page_size}&offset={page_index-1}"
+    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublishedYear%2CPublishedBy%2CStatus%2CThumbImage%2CBookCollectionsList%2CCreatedAt%2CUpdatedAt%2CThumbImageFeatureVector&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29&limit={page_size}&offset={page_index-1}"
 
     payload={}
     headers = {
         'accept': 'application/json',
-        'xc-token': '5Bdhl77iJJ1fIbF2fPb8hcCceNzSJvmt4NIya0aR'
+        'xc-token': db_token
     }
 
     response = requests.request("GET", url, headers=headers, data=payload)
@@ -98,7 +103,7 @@ def get_draft_book_list_paging(page_index: int = 1, page_size: int = 20) -> Draf
     payload={}
     headers = {
         'accept': 'application/json',
-        'xc-token': '5Bdhl77iJJ1fIbF2fPb8hcCceNzSJvmt4NIya0aR'
+        'xc-token': db_token
     }
 
     response = requests.request("GET", url, headers=headers, data=payload)
@@ -117,12 +122,12 @@ def get_draft_book_list_paging(page_index: int = 1, page_size: int = 20) -> Draf
 
 def get_book_list_paging(page_index: int = 1, page_size: int = 20) -> BookListResponse | None:    
     time_start = time.time()
-    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublishedYear%2CPublishedBy%2CStatus%2CThumbImage%2CBookCollections%20List%2CCreatedAt%2CUpdatedAt&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29&limit={page_size}&offset={page_index-1}"
+    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublishedYear%2CPublishedBy%2CStatus%2CThumbImage%2CBookCollectionsList%2CCreatedAt%2CUpdatedAt&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29&limit={page_size}&offset={page_index-1}"
 
     payload={}
     headers = {
         'accept': 'application/json',
-        'xc-token': '5Bdhl77iJJ1fIbF2fPb8hcCceNzSJvmt4NIya0aR'
+        'xc-token': db_token
     }
 
     response = requests.request("GET", url, headers=headers, data=payload)
@@ -197,7 +202,7 @@ def create_draft_book(result_upload, feature_vector_base64) -> DraftBook | None:
         })
         headers = {
             'accept': 'application/json',
-            'xc-token': '5Bdhl77iJJ1fIbF2fPb8hcCceNzSJvmt4NIya0aR',
+            'xc-token': db_token,
             'Content-Type': 'application/json'
         }
 
@@ -235,7 +240,7 @@ def create_book(request: CreateNewBookRequest) -> Book | None:
 
         headers = {
             'accept': 'application/json',
-            'xc-token': '5Bdhl77iJJ1fIbF2fPb8hcCceNzSJvmt4NIya0aR',
+            'xc-token': db_token,
             'Content-Type': 'application/json'
         }
 
@@ -267,7 +272,7 @@ def upload_file_image(file_name, file_contents, content_type):
             ('file',(str(file_name), file_contents, str(content_type)))
         ]
         headers = {
-            'xc-token': '5Bdhl77iJJ1fIbF2fPb8hcCceNzSJvmt4NIya0aR'
+            'xc-token': db_token
         }
 
         response = requests.request("POST", url, headers=headers, data=payload, files=files)
