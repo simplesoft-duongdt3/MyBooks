@@ -13,15 +13,20 @@ class DraftBook(BaseModel):
     UpdatedAt: str
     Status: str
 
-class DraftBookListResponse(BaseModel):
-    list: list[DraftBook] | None
+class DraftBookFromDb(DraftBook):
+    Thumb_Image_Feature_Vector: str | None = Field(alias='Thumb Image Feature Vector', default=None)
 
-class BookCollectionsList(BaseModel):
+class DraftBookListResponse(BaseModel):
+    draftBooks: list[DraftBook] | None
+
+class DraftBookListResponseFromDb(BaseModel):
+    list: list[DraftBookFromDb] | None
+
+class BookCollectionsListItem(BaseModel):
     Id: int
     Name: str | None = None
     CreatedAt: str
     UpdatedAt: str
-
 
 class Book(BaseModel):
     Id: int
@@ -29,13 +34,26 @@ class Book(BaseModel):
     CreatedAt: str
     UpdatedAt: str
     Authors: str | None = None
-    Published_Year: str | None = Field(alias='Published Year', default=None)
-    Published_By: str | None = Field(alias='Published By', default=None)
+    PublishedYear: str | None = Field(alias='Published Year', default=None)
+    PublishedBy: str | None = Field(alias='Published By', default=None)
     Status: str
     ThumbImage: list[ThumbImageItem] | None = None
-    BookCollections_List: list[BookCollectionsList] | None = Field(alias='BookCollections List', default=None)
 
+class BookFromDb(Book):
+    Thumb_Image_Feature_Vector: str | None = Field(alias='Thumb Image Feature Vector', default=None)
 
 class BookListResponse(BaseModel):
-    list: list[Book] | None
-    
+    books: list[Book] | None
+
+class BookListResponseFromDb(BaseModel):
+    list: list[BookFromDb] | None
+
+class BookSimilarItem(Book):
+    distance: float
+
+class ListBookSimilarResponse(BaseModel):
+    listBookSimilar: list[BookSimilarItem]
+
+class CreateDraftBookResponse(BaseModel):
+    draftBook: DraftBook
+    listBookSimilar: list[BookSimilarItem]
