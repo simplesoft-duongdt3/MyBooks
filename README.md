@@ -87,7 +87,11 @@ python -m pip install python-multipart
 python -m pip install pydantic
 python -m pip install requests
 python -m pip install loguru
+python -m pip install gunicorn
+
 uvicorn api:app --reload
+
+gunicorn api:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 
 
 from fastapi import FastAPI
