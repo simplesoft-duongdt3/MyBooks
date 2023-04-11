@@ -86,7 +86,7 @@ python -m pip install uvicorn
 python -m pip install python-multipart
 python -m pip install pydantic
 python -m pip install requests
-
+python -m pip install loguru
 uvicorn api:app --reload
 
 

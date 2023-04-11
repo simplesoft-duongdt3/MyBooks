@@ -1,12 +1,19 @@
 from pydantic import BaseModel
 
-class GetDraftBookDetailRequest(BaseModel):
-    draft_book_id: int
+from response_models import ThumbImageItem
 
 class CreateNewBookRequest(BaseModel):
-    draft_book_id: int
-    name: str | None = None
-    author: str | None = None
-    published_by: str | None = None
-    published_year: int | None = None
+    DraftBookId: int
+    Name: str | None = None
+    Authors: str | None = None
+    PublishedBy: str | None = None
+    PublishedYear: int | None = None
 
+
+class BookRequestToDb(BaseModel):
+    Name: str | None = None
+    Authors: str | None = None
+    PublishedYear: int | None
+    PublishedBy: str | None
+    ThumbImage: list[ThumbImageItem] | None = None
+    ThumbImageFeatureVector: str | None
