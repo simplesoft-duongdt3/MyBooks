@@ -18,10 +18,9 @@ from response_models import Book, BookFromDb, BookListResponse, BookListResponse
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
-import logging
-logging.basicConfig()
-logger = logging.getLogger('app_log')
-logger.setLevel(logging.INFO)
+from loguru import logger
+logger.add("logs/file_log.log", format="{time} {level} {message}", rotation="12:00", level="INFO")
+
 import uvicorn
 
 app = FastAPI()
