@@ -1,4 +1,11 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+
+class Paging(BaseModel):
+    isFirstPage: bool
+    isLastPage: bool
+    totalRows: int
+    page: int
+    pageSize: int
 
 class ThumbImageItem(BaseModel):
     mimetype: str
@@ -14,13 +21,15 @@ class DraftBook(BaseModel):
     Status: str
 
 class DraftBookFromDb(DraftBook):
-    Thumb_Image_Feature_Vector: str | None = Field(alias='Thumb Image Feature Vector', default=None)
+    ThumbImageFeatureVector: str | None
 
 class DraftBookListResponse(BaseModel):
     draftBooks: list[DraftBook] | None
+    paging: Paging
 
 class DraftBookListResponseFromDb(BaseModel):
     list: list[DraftBookFromDb] | None
+    pageInfo: Paging
 
 class BookCollectionsListItem(BaseModel):
     Id: int
@@ -34,19 +43,21 @@ class Book(BaseModel):
     CreatedAt: str
     UpdatedAt: str
     Authors: str | None = None
-    PublishedYear: str | None = Field(alias='Published Year', default=None)
-    PublishedBy: str | None = Field(alias='Published By', default=None)
+    PublishedYear: str | None
+    PublishedBy: str | None
     Status: str
     ThumbImage: list[ThumbImageItem] | None = None
 
 class BookFromDb(Book):
-    Thumb_Image_Feature_Vector: str | None = Field(alias='Thumb Image Feature Vector', default=None)
+    ThumbImageFeatureVector: str | None
 
 class BookListResponse(BaseModel):
     books: list[Book] | None
+    paging: Paging
 
 class BookListResponseFromDb(BaseModel):
     list: list[BookFromDb] | None
+    pageInfo: Paging
 
 class BookSimilarItem(Book):
     distance: float
