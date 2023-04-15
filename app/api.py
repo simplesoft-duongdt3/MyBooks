@@ -27,8 +27,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI()
-api_endpoint = name = os.getenv("HOST_DB", "")
-db_token = name = os.getenv("DB_TOKEN", "")
+api_endpoint = os.getenv("HOST_DB", "")
+db_token = os.getenv("DB_TOKEN", "")
+min_distance_images = float(os.getenv("IMAGE_MIN_DISTANCE", "0.8"))
 
 # Initialize Img2Vec without GPU
 img2vec = Img2Vec(cuda=False, model='resnet18')
@@ -52,7 +53,9 @@ def get_draft_book_detail_from_db(draft_book_id: int) -> DraftBookFromDb | None:
     
     return draft_book
         
-    
+def key_search_similar_books(book: BookSimilarItem):
+    return book.distance
+
 def check_feature_vector_all_exists_books(image_feature_vector) -> list[BookSimilarItem]:
     list_book_similar: list[BookSimilarItem] = []
     
@@ -77,7 +80,7 @@ def check_feature_vector_all_exists_books(image_feature_vector) -> list[BookSimi
                 decodeData = pickle.loads(codecs.decode(book_feature_vector.encode(),'base64'))
 
                 distance = cosine_similarity(image_feature_vector.reshape((1, -1)), decodeData.reshape((1, -1)))[0][0]
-                if distance >= 0.9:
+                if distance >= min_distance_images:
                     list_book_similar.append(BookSimilarItem(
                         Id=book.Id,
                         Name=book.Name,
@@ -94,6 +97,8 @@ def check_feature_vector_all_exists_books(image_feature_vector) -> list[BookSimi
                 logger.info(f"Id = {str(book.Id)} {book.Name} distance = " + str(distance))
     time_end = time.time()
     logger.info(f"check_feature_vector_all_exists_books time= {str(time_end - time_start)}")
+
+    list_book_similar.sort(reverse=True, key=key_search_similar_books)
     return list_book_similar
 
 def get_draft_book_list_paging(page_index: int = 1, page_size: int = 20) -> DraftBookListResponse | None:    
