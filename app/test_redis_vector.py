@@ -41,7 +41,7 @@ if __name__ == "__main__":
     redis_conn.ping()
     print ('Connected to redis')
     redis_conn.flushall()
-    
+
     create_flat_index(redis_conn, PRODUCT_IMAGE_VECTOR_FIELD,NUMBER_PRODUCTS,IMAGE_VECTOR_DIMENSION,DISTANCE_METRIC)
 
 
@@ -66,9 +66,14 @@ if __name__ == "__main__":
         'name' : 'Image 001',
         PRODUCT_IMAGE_VECTOR_FIELD: vector_bytes,
     }
-    p = redis_conn.pipeline(transaction=False)
-    p.hset('001',mapping=item_metadata)
+    # For multi records
+    # p = redis_conn.pipeline(transaction=False)
+    # p.hset('001',mapping=item_metadata)
 
+    redis_conn.hset('001',mapping=item_metadata)
+    
+
+    print(f'Keys redis size {len(redis_conn.keys())}')
 
     topK=5
     query_vector = vector_bytes
