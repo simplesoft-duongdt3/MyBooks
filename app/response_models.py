@@ -68,3 +68,7 @@ class ListBookSimilarResponse(BaseModel):
 class CreateDraftBookResponse(BaseModel):
     draftBook: DraftBook
     listBookSimilar: list[BookSimilarItem]
+
+class SimilarItem(BaseModel):
+    similar_score: float
+    book_id: int

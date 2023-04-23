@@ -1,38 +1,25 @@
 import os
 from typing import Annotated
-import base64
 import json
 from fastapi import FastAPI, File, UploadFile, HTTPException
 import requests
-import io
 import time
 from datetime import datetime
-import pickle
-import codecs
-# from img2vec.img2vec_pytorch.img_to_vec import Img2Vec
-from img2vec_pytorch import Img2Vec
-from PIL import Image
-from sklearn.metrics.pairwise import cosine_similarity
 from request_models import BookRequestToDb, CreateNewBookRequest
-from response_models import Book, BookFromDb, BookListResponse, BookListResponseFromDb, BookSimilarItem, CreateDraftBookResponse, DraftBook, DraftBookFromDb, DraftBookListResponse, DraftBookListResponseFromDb
+from response_models import SimilarItem, Book, BookFromDb, BookListResponse, BookListResponseFromDb, BookSimilarItem, CreateDraftBookResponse, DraftBook, DraftBookFromDb, DraftBookListResponse, DraftBookListResponseFromDb
 
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
-from loguru import logger
-logger.add("logs/file_log.log", format="{time} {level} {message}", rotation="12:00", level="INFO")
-
+from util import logger
 import uvicorn
-from dotenv import load_dotenv
-load_dotenv()
+from vector_db import get_image_feature_vector_bytes, encode_base64_feature_vector_bytes, decode_feature_vector_base64_str, search_vectors, insert_vector_product
+
 
 app = FastAPI()
 api_endpoint = os.getenv("HOST_DB", "")
 db_token = os.getenv("DB_TOKEN", "")
 min_distance_images = float(os.getenv("IMAGE_MIN_DISTANCE", "0.8"))
-
-# Initialize Img2Vec without GPU
-img2vec = Img2Vec(cuda=False, model='resnet18')
 
 def get_draft_book_detail_from_db(draft_book_id: int) -> DraftBookFromDb | None:
     time_start = time.time()
@@ -56,13 +43,30 @@ def get_draft_book_detail_from_db(draft_book_id: int) -> DraftBookFromDb | None:
 def key_search_similar_books(book: BookSimilarItem):
     return book.distance
 
-def check_feature_vector_all_exists_books(image_feature_vector) -> list[BookSimilarItem]:
+
+def convert_list_similar2_dict(list_item: list[SimilarItem], min_distance: float) -> dict[int, SimilarItem]:
+    res_dict: dict[int, SimilarItem] = {}
+    for i in range(0, len(list_item)):
+        if list_item[i].similar_score >= min_distance:
+            res_dict[list_item[i].book_id] = list_item[i]
+    return res_dict
+
+def check_feature_vector_all_exists_books(image_feature_vector: bytes) -> list[BookSimilarItem]:
     list_book_similar: list[BookSimilarItem] = []
     
     time_start = time.time()
-    page_size = 100
-    page_index = 1
-    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublishedYear%2CPublishedBy%2CStatus%2CThumbImage%2CBookCollectionsList%2CCreatedAt%2CUpdatedAt%2CThumbImageFeatureVector&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29&limit={page_size}&offset={page_index-1}"
+    list_similar: list[SimilarItem] = search_vectors(topK=5, vector_bytes=image_feature_vector)
+    logger.info(f'found list_similar = {list_similar}')
+
+    dict_similar_item: dict[int, SimilarItem] = convert_list_similar2_dict(list_item=list_similar, min_distance=min_distance_images)
+    if(len(dict_similar_item.keys()) == 0):
+        return list_book_similar
+    
+    logger.info(f'found dict_similar_item = {dict_similar_item}')
+
+    list_similar_id: list[str] = list(map(lambda item: str(item), dict_similar_item.keys()))
+    in_ids_condition = '%2C'.join(list_similar_id)
+    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublishedYear%2CPublishedBy%2CStatus%2CThumbImage%2CBookCollectionsList%2CCreatedAt%2CUpdatedAt%2CThumbImageFeatureVector&sort=-UpdatedAt&where=%28Id%2Cin{in_ids_condition}%29"
 
     payload={}
     headers = {
@@ -75,30 +79,29 @@ def check_feature_vector_all_exists_books(image_feature_vector) -> list[BookSimi
     bookListDb: BookListResponseFromDb = BookListResponseFromDb.parse_raw(response.text)
     if bookListDb and bookListDb.list is not None:
         for book in bookListDb.list:
-            book_feature_vector = book.ThumbImageFeatureVector
-            if book_feature_vector:
-                decodeData = pickle.loads(codecs.decode(book_feature_vector.encode(),'base64'))
+            if book.Id in dict_similar_item:
+                book_similar = dict_similar_item[book.Id]
+                distance: float = book_similar.similar_score
 
-                distance = cosine_similarity(image_feature_vector.reshape((1, -1)), decodeData.reshape((1, -1)))[0][0]
-                if distance >= min_distance_images:
-                    list_book_similar.append(BookSimilarItem(
-                        Id=book.Id,
-                        Name=book.Name,
-                        ThumbImage=book.ThumbImage,
-                        Authors=book.Authors,
-                        CreatedAt=book.CreatedAt,
-                        UpdatedAt=book.UpdatedAt,
-                        PublishedYear=book.PublishedYear,
-                        PublishedBy=book.PublishedBy,
-                        Status=book.Status,
-                        distance=distance,
-                    ))
-                    
-                logger.info(f"Id = {str(book.Id)} {book.Name} distance = " + str(distance))
+                list_book_similar.append(BookSimilarItem(
+                    Id=book.Id,
+                    Name=book.Name,
+                    ThumbImage=book.ThumbImage,
+                    Authors=book.Authors,
+                    CreatedAt=book.CreatedAt,
+                    UpdatedAt=book.UpdatedAt,
+                    PublishedYear=book.PublishedYear,
+                    PublishedBy=book.PublishedBy,
+                    Status=book.Status,
+                    distance=distance,
+                ))
+    logger.info(f'found list_book_similar = {list_book_similar}')
+
     time_end = time.time()
     logger.info(f"check_feature_vector_all_exists_books time= {str(time_end - time_start)}")
 
     list_book_similar.sort(reverse=True, key=key_search_similar_books)
+    logger.info(f'found list_book_similar after sort by desc distance = {list_book_similar}')
     return list_book_similar
 
 def get_draft_book_list_paging(page_index: int = 1, page_size: int = 20) -> DraftBookListResponse | None:    
@@ -147,55 +150,6 @@ def get_book_list_paging(page_index: int = 1, page_size: int = 20) -> BookListRe
             paging=list_book.pageInfo,
         )
 
-def get_image_feature_vector(file_content):
-    # Read in an image (rgb format)
-    img = Image.open(io.BytesIO(file_content))
-    # Get a vector from img2vec, returned as a torch FloatTensor
-    vec = img2vec.get_vec(img, tensor=True)
-    return vec
-
-@app.get("/")
-async def root():
-    time_start = time.time()
-
-    # Read in an image (rgb format)
-    img = Image.open('b01.jpg')
-    # Get a vector from img2vec, returned as a torch FloatTensor
-    vec = img2vec.get_vec(img, tensor=True)
-    #logger.info(vec)
-    pickled = pickle.dumps(vec)
-
-    logger.info(f"length of {len(pickled)}")
-
-    base64Data = codecs.encode(pickled, "base64").decode()
-
-    logger.info(base64Data)
-
-    decodeData = pickle.loads(codecs.decode(base64Data.encode(),'base64'))
-
-    logger.info(f"length of {len(decodeData)}")
-    #logger.info(decodeData)
-
-    distance = cosine_similarity(vec.reshape((1, -1)), decodeData.reshape((1, -1)))[0][0]
-    time_end = time.time()
-    logger.info("distance = " + str(distance) + " time= " + str(time_end - time_start))
-
-    img2 = Image.open('b02.jpg')
-    vec2 = img2vec.get_vec(img2, tensor=True)
-
-    distance2 = cosine_similarity(vec.reshape((1, -1)), vec2.reshape((1, -1)))[0][0]
-    time_end = time.time()
-    logger.info("distance2 = " + str(distance2) + " time= " + str(time_end - time_start))
-    
-
-    img3 = Image.open('b01_1.jpg')
-    vec3 = img2vec.get_vec(img3, tensor=True)
-
-    distance3 = cosine_similarity(vec.reshape((1, -1)), vec3.reshape((1, -1)))[0][0]
-    time_end = time.time()
-    logger.info(f"distance3 = {str(distance3)} time= {str(time_end - time_start)}")
-    return {"message": "Hello World"}
-
 def create_draft_book(result_upload, feature_vector_base64) -> DraftBook | None:
     try:
         logger.info(f'create_draft_book {result_upload}')
@@ -229,8 +183,10 @@ def create_book(request: CreateNewBookRequest) -> Book | None:
         # TODO feature_vector_base64: get draft book detail from request.draft_book_id
 
         if not draft_book:
-            logger.exception(f"create_book: Get draft book error. draft_book_id: {request.DraftBookId}")
+            logger.exception(f"create_book: Not found draft book. draft_book_id: {request.DraftBookId}")
             return None
+
+        image_vector_base64_str = draft_book.ThumbImageFeatureVector
 
         bookRequestToDb = BookRequestToDb(
             Authors=request.Authors,
@@ -238,7 +194,7 @@ def create_book(request: CreateNewBookRequest) -> Book | None:
             PublishedBy=request.PublishedBy,
             PublishedYear=request.PublishedYear,
             ThumbImage=draft_book.ThumbImage,
-            ThumbImageFeatureVector=draft_book.ThumbImageFeatureVector,
+            ThumbImageFeatureVector=image_vector_base64_str,
         )
         
         payload = bookRequestToDb.json()
@@ -253,15 +209,19 @@ def create_book(request: CreateNewBookRequest) -> Book | None:
         logger.info(f'create_book response {str(response)}')
         time_end = time.time()
         logger.info("create_book time= " + str(time_end - time_start))
-        return BookFromDb.parse_raw(response.text)
+        
+            
+        book_inserted = BookFromDb.parse_raw(response.text)
+        
+        # insert into vector db
+        insert_vector_product(
+            product_id=book_inserted.Id,
+            product_vector_bytes=decode_feature_vector_base64_str(image_vector_base64_str),
+        )
+        return book_inserted
     except Exception as e:
         logger.exception(f"create_book: An exception was thrown! {e}")
         return None
-
-def encode_base64_feature_vector(feature_vector) -> str:
-    pickled = pickle.dumps(feature_vector)
-    base64Data = codecs.encode(pickled, "base64").decode()
-    return base64Data
 
 def upload_file_image(file_name, file_contents, content_type):
     try:
@@ -300,9 +260,9 @@ async def upload_draft_image(
         time_start = time.time()
         contents = file.file.read()
 
-        feature_vector = get_image_feature_vector(contents)
-        feature_vector_base64 = encode_base64_feature_vector(feature_vector)
-        list_book_similar = check_feature_vector_all_exists_books(feature_vector)
+        feature_vector: bytes = get_image_feature_vector_bytes(file_bytes=contents)
+        feature_vector_base64: str = encode_base64_feature_vector_bytes(feature_vector)
+        list_book_similar: list[BookSimilarItem] = check_feature_vector_all_exists_books(feature_vector)
 
         response_upload_file = upload_file_image(file.filename, contents, file.content_type)
         
@@ -370,9 +330,8 @@ async def get_draft_book_detail(id: int) -> CreateDraftBookResponse | None:
         response: CreateDraftBookResponse | None = None
         list_book_similar: list[BookSimilarItem] = []
         if draft_book and draft_book.ThumbImageFeatureVector:
-
-            feature_vector = pickle.loads(codecs.decode(draft_book.ThumbImageFeatureVector.encode(),'base64'))
-            list_book_similar = check_feature_vector_all_exists_books(feature_vector)
+            feature_vector_bytes = decode_feature_vector_base64_str(draft_book.ThumbImageFeatureVector)
+            list_book_similar = check_feature_vector_all_exists_books(feature_vector_bytes)
             response = CreateDraftBookResponse(
                 draftBook=draft_book,
                 listBookSimilar=list_book_similar,
