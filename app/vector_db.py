@@ -10,7 +10,7 @@ from redis.commands.search.query import Query
 from PIL import Image
 from img2vec_pytorch import Img2Vec
 import io
-from response_models import SimilarItem
+from response_models import SimilarItem, VectorProduct
 from util import logger
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -50,11 +50,24 @@ def create_flat_index (redis_conn: Redis, index_name: str, vector_field_name: st
 
 
 def insert_vector_product(product_id: int, product_vector_bytes: bytes, id_field_name: str = PRODUCT_ID_FIELD, vector_field_name: str = PRODUCT_IMAGE_VECTOR_FIELD, redis_conn: Redis = redis_conn):
+    logger.info(f'insert_list_vector_product {product_id}')
     item_metadata = {
         id_field_name : product_id,
         vector_field_name: product_vector_bytes,
     }
     redis_conn.hset(f'{product_id}', mapping=item_metadata)
+
+def insert_list_vector_product(list_vector_product: list[VectorProduct], id_field_name: str = PRODUCT_ID_FIELD, vector_field_name: str = PRODUCT_IMAGE_VECTOR_FIELD, redis_conn: Redis = redis_conn):
+    logger.info(f'insert_list_vector_product {len(list_vector_product)}')
+
+    for product in list_vector_product:
+        insert_vector_product(
+            product_id=product.product_id,
+            product_vector_bytes=product.product_vector_bytes,
+            id_field_name=id_field_name,
+            redis_conn=redis_conn,
+            vector_field_name=vector_field_name,
+        )
 
 def search_vectors(topK: int, vector_bytes: bytes) -> list[SimilarItem]:
     listSimilarItem: list[SimilarItem] = []

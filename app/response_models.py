@@ -72,3 +72,13 @@ class CreateDraftBookResponse(BaseModel):
 class SimilarItem(BaseModel):
     similar_score: float
     book_id: int
+
+class VectorProduct(BaseModel):
+    product_vector_bytes: bytes
+    product_id: int
+
+class ListBookVectorProduct(BaseModel):
+    listBookVectorProduct: list[VectorProduct]
+
+class ListBookVectorProductResponse(BaseModel):
+    list_id: list[int]

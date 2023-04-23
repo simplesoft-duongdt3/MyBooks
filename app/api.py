@@ -6,14 +6,14 @@ import requests
 import time
 from datetime import datetime
 from request_models import BookRequestToDb, CreateNewBookRequest
-from response_models import SimilarItem, Book, BookFromDb, BookListResponse, BookListResponseFromDb, BookSimilarItem, CreateDraftBookResponse, DraftBook, DraftBookFromDb, DraftBookListResponse, DraftBookListResponseFromDb
+from response_models import ListBookVectorProductResponse, ListBookVectorProduct, VectorProduct, SimilarItem, Book, BookFromDb, BookListResponse, BookListResponseFromDb, BookSimilarItem, CreateDraftBookResponse, DraftBook, DraftBookFromDb, DraftBookListResponse, DraftBookListResponseFromDb
 
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
 from util import logger
 import uvicorn
-from vector_db import get_image_feature_vector_bytes, encode_base64_feature_vector_bytes, decode_feature_vector_base64_str, search_vectors, insert_vector_product
+from vector_db import insert_list_vector_product, get_image_feature_vector_bytes, encode_base64_feature_vector_bytes, decode_feature_vector_base64_str, search_vectors, insert_vector_product
 
 
 app = FastAPI()
@@ -149,6 +149,37 @@ def get_book_list_paging(page_index: int = 1, page_size: int = 20) -> BookListRe
             books=list(map(lambda item: item, list_book.list)),
             paging=list_book.pageInfo,
         )
+    
+def get_book_list_vector() -> ListBookVectorProduct | None:    
+    time_start = time.time()
+    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublishedYear%2CPublishedBy%2CStatus%2CThumbImage%2CBookCollectionsList%2CCreatedAt%2CUpdatedAt%2CThumbImageFeatureVector&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29"
+    payload={}
+    headers = {
+        'accept': 'application/json',
+        'xc-token': db_token
+    }
+    
+    response = requests.request("GET", url, headers=headers, data=payload)
+    list_book : BookListResponseFromDb = BookListResponseFromDb.parse_raw(response.text)
+    logger.info(f"get_book_list_vector list_book= {len(list_book.list)}")
+    
+    listBookVectorProduct: list[VectorProduct] = []
+
+    if list_book and list_book.list is not None:
+        for book in list_book.list:
+            if book.ThumbImageFeatureVector and len(book.ThumbImageFeatureVector) > 0:
+                listBookVectorProduct.append(
+                    VectorProduct(
+                        product_id=book.Id,
+                        product_vector_bytes=decode_feature_vector_base64_str(book.ThumbImageFeatureVector),
+                    )
+                )
+    logger.info(f"get_book_list_vector listBookVectorProduct= {len(listBookVectorProduct)}")
+    time_end = time.time()
+    logger.info(f"get_book_list_vector time= {str(time_end - time_start)}")
+    return ListBookVectorProduct(
+        listBookVectorProduct=listBookVectorProduct,
+    )
 
 def create_draft_book(result_upload, feature_vector_base64) -> DraftBook | None:
     try:
@@ -318,6 +349,23 @@ async def get_books(page: int = 1, limit: int = 20) -> BookListResponse | None:
         return list_result
     except Exception as e:
         logger.exception(f"get_books: An exception was thrown! {str(e)}")
+        return None
+    
+@app.post("/update-books-vector")
+async def update_books_vector() -> ListBookVectorProductResponse | None:
+    try:
+        time_start = time.time()
+        list_result: ListBookVectorProduct | None = get_book_list_vector()
+        if list_result:
+            insert_list_vector_product(list_vector_product=list_result.listBookVectorProduct)
+
+        time_end = time.time()
+        list_id: list[int] = list(map(lambda item: item.product_id, list_result.listBookVectorProduct))
+        logger.info("get update_books_vector time= " + str(time_end - time_start))
+        
+        return ListBookVectorProductResponse(list_id=list_id) 
+    except Exception as e:
+        logger.exception(f"update_books_vector: An exception was thrown! {str(e)}")
         return None
     
 @app.get("/draft_books/{id}")
