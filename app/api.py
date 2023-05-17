@@ -150,9 +150,9 @@ def get_book_list_paging(page_index: int = 1, page_size: int = 20) -> BookListRe
             paging=list_book.pageInfo,
         )
     
-def get_book_list_vector() -> ListBookVectorProduct | None:    
+def get_all_book_list_vector() -> ListBookVectorProduct | None:    
     time_start = time.time()
-    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublishedYear%2CPublishedBy%2CStatus%2CThumbImage%2CBookCollectionsList%2CCreatedAt%2CUpdatedAt%2CThumbImageFeatureVector&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29"
+    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublishedYear%2CPublishedBy%2CStatus%2CThumbImage%2CBookCollectionsList%2CCreatedAt%2CUpdatedAt%2CThumbImageFeatureVector&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29&limit=2000&offset=0"
     payload={}
     headers = {
         'accept': 'application/json',
@@ -355,7 +355,7 @@ async def get_books(page: int = 1, limit: int = 20) -> BookListResponse | None:
 async def update_books_vector() -> ListBookVectorProductResponse | None:
     try:
         time_start = time.time()
-        list_result: ListBookVectorProduct | None = get_book_list_vector()
+        list_result: ListBookVectorProduct | None = get_all_book_list_vector()
         if list_result:
             insert_list_vector_product(list_vector_product=list_result.listBookVectorProduct)
 

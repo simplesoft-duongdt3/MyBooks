@@ -4,7 +4,8 @@ source venv/bin/activate
 # python -m pip install -r requirements.txt
 
 cd app
-gunicorn api:app --access-logfile `pwd`/logs/gunicorn_access.log --error-logfile `pwd`/logs/gunicorn_error.log --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000  --daemon
+python api.py
+# gunicorn api:app --access-logfile `pwd`/logs/gunicorn_access.log --error-logfile `pwd`/logs/gunicorn_error.log --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000  --daemon
 
 # Stop
 # kill -9 `ps aux | grep gunicorn | grep api:app | awk '{ print $2 }'`
