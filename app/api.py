@@ -104,9 +104,14 @@ def check_feature_vector_all_exists_books(image_feature_vector: bytes) -> list[B
     logger.info(f'found list_book_similar after sort by desc distance = {list_book_similar}')
     return list_book_similar
 
+
+def getOffsetFromPage(page_index: int, page_size: int):
+    return (page_index - 1) * page_size
+
 def get_draft_book_list_paging(page_index: int = 1, page_size: int = 20) -> DraftBookListResponse | None:    
     time_start = time.time()
-    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/DraftBooks?fields=Id%2CThumbImage%2CCreatedAt%2CUpdatedAt%2CStatus&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29&limit={page_size}&offset={page_index - 1}"
+    offset = getOffsetFromPage(page_index=page_index, page_size=page_size)
+    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/DraftBooks?fields=Id%2CThumbImage%2CCreatedAt%2CUpdatedAt%2CStatus&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29&limit={page_size}&offset={offset}"
 
     payload={}
     headers = {
@@ -130,7 +135,8 @@ def get_draft_book_list_paging(page_index: int = 1, page_size: int = 20) -> Draf
 
 def get_book_list_paging(page_index: int = 1, page_size: int = 20) -> BookListResponse | None:    
     time_start = time.time()
-    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublishedYear%2CPublishedBy%2CStatus%2CThumbImage%2CBookCollectionsList%2CCreatedAt%2CUpdatedAt&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29&limit={page_size}&offset={page_index-1}"
+    offset = getOffsetFromPage(page_index=page_index, page_size=page_size)
+    url = f"{api_endpoint}/api/v1/db/data/v1/MyBooks/Books?fields=Id%2CName%2CAuthors%2CPublishedYear%2CPublishedBy%2CStatus%2CThumbImage%2CBookCollectionsList%2CCreatedAt%2CUpdatedAt&sort=-UpdatedAt&where=where%3D%28Status%2Ceq%2CActive%29&limit={page_size}&offset={offset}"
 
     payload={}
     headers = {
