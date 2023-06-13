@@ -326,7 +326,7 @@ async def get_draft_books(page: int = 1, limit: int = 20) -> DraftBookListRespon
         logger.info(f"get_draft_books start page {page} limit {limit}")
         time_start = time.time()
         list_result: DraftBookListResponse | None = get_draft_book_list_paging(
-            page_index=page - 1,
+            page_index=page,
             page_size=limit,
         )
         time_end = time.time()
@@ -341,7 +341,7 @@ async def get_books(page: int = 1, limit: int = 20) -> BookListResponse | None:
     try:
         time_start = time.time()
         list_result: BookListResponse | None = get_book_list_paging(
-            page_index=page - 1,
+            page_index=page,
             page_size=limit,
         )
         time_end = time.time()
